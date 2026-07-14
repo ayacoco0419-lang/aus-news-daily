@@ -27,17 +27,7 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: |
           mkdir -p .claude
-          printf '{
-  "mcpServers": {
-    "Notion": {
-      "command": "npx",
-      "args": ["-y", "@notionhq/notion-mcp-server"],
-      "env": {
-        "NOTION_API_KEY": "%s"
-      }
-    }
-  }
-}' "${NOTION_TOKEN}" > .claude/settings.json
+          printf '{"mcpServers":{"Notion":{"command":"npx","args":["-y","@notionhq/notion-mcp-server"],"env":{"NOTION_API_KEY":"%s"}}}}' "${NOTION_TOKEN}" > .claude/settings.json
 
       - name: Run Claude Code news digest
         env:
