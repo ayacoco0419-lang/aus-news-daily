@@ -65,17 +65,29 @@ Notion APIが失敗した場合は空リストで続行する。
 
 ## Step 4: Section B — 豪州主要ニュース10本
 
-**重要: このセクションのWebSearch呼び出しでは `allowed_domains` オプションを絶対に渡さないこと。** 前回、複数ドメインを一度に指定したところ400エラーで全滅した実績がある。以下の優先順で取得する。
+**重要: このセクションのWebSearch呼び出しでは `allowed_domains` オプションを絶対に渡さないこと。** 複数ドメインを一度に指定すると400エラーになることが確認済み。また、承認ドメイン（abc.net.au / smh.com.au / theguardian.com / afr.com / 9news.com.au 等）はWebFetch・WebSearchのいずれからも直接アクセスできないケースが恒常的に発生している（"Claude Code is unable to fetch from ..."エラー、またはWebSearchで承認ドメインの記事が一切ヒットしない）。これはツール側の制約であり、クエリの工夫では解消しない。以下の優先順で取得する。
 
-1. **RSSフィード（WebFetchで直接取得。第1手段）:**
+1. **RSSフィード直接取得（WebFetchで直接取得。第1手段）:**
    - ABC News: `https://www.abc.net.au/news/feed/51120/rss.xml`
    - The Guardian AU: `https://www.theguardian.com/australia-news/rss`
    - Reuters: `https://feeds.reuters.com/reuters/businessNews`
    - SMH: `https://www.smh.com.au/rss/feed.xml`
    - 9News: `https://www.9news.com.au/feed`
-   - 取得できたRSSから `<item>` の `<title>` / `<link>` / `<pubDate>` を抽出する。個別のRSSが404等で失敗しても他のRSSは試し続けること（1つの失敗で全体を諦めない）
+   - 取得できたRSSから `<item>` の `<title>` / `<link>` / `<pubDate>` を抽出する。個別のRSSが404等で失敗しても他のRSSは試し続けること。**多くの場合これらは全滅する（既知の問題）ため、失敗しても消耗せず速やかに手段2へ進むこと。**
 
-2. **WebSearch（RSSで10本に満たない場合のみ、フォールバック）:** 以下のクエリを**ドメイン指定なし（allowed_domainsパラメータなし）**のプレーンテキストで実行し、返ってきた結果のURLを承認ドメインリストと手動で照合して絞り込む
+2. **Bing News RSSフォールバック（第2手段・推奨。手段1で10本に満たない場合）:**
+   承認ドメインごとに以下のURLパターンでWebFetchする（ドメインごとに個別実行すること。複数ドメインをORで結合すると精度が落ちる）:
+
+   `https://www.bing.com/news/search?q=site%3A{ドメイン}+Australia&qft=interval%3d%227%22&format=rss&mkt=en-AU`
+
+   対象ドメイン: abc.net.au / smh.com.au / theage.com.au / news.com.au / theguardian.com / afr.com / theaustralian.com.au / 9news.com.au / skynews.com.au / reuters.com / apnews.com
+
+   - 取得できたRSSから `<item>` の `title` / `link` / `pubDate` を抽出する。
+   - **apnews.comは`link`が`http://www.bing.com/news/apiclick.aspx?...&url=<URLエンコードされた実URL>`というリダイレクトラッパー形式になっている。`url=`パラメータをURLデコードして実際のapnews.com記事URLを復元すること。** それ以外のドメイン（abc.net.au / theguardian.com / reuters.com / afr.com等）は`link`に直接記事URLが入っている。
+   - **稀に`https://www.smh.com.au#category/...`のように`/`が欠落したURLが返ることがある。ドメイン直後が`#`になっているURLを見つけたら、`#`を`/`に修正するか、WebFetchで実在確認してから採用すること。**
+   - あるドメインで0件返ってきても異常ではない（その日その媒体にAustralia関連の新着がないだけの可能性がある）。1ドメインの0件で全体を諦めず、残りのドメインを試し続けること。
+
+3. **WebSearch（手段1・2で10本に満たない場合のみ、最終フォールバック）:** 以下のクエリを**ドメイン指定なし（allowed_domainsパラメータなし）**のプレーンテキストで実行し、返ってきた結果のURLを承認ドメインリストと手動で照合して絞り込む
 
    | # | クエリ |
    |---|---|
