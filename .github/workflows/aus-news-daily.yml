@@ -1,0 +1,50 @@
+name: 豪州ニュース デイリーダイジェスト
+
+on:
+  schedule:
+    - cron: '0 20 * * *'  # 06:00 AEST (UTC+10) / 07:00 AEDT (UTC+11)
+  workflow_dispatch:       # 手動実行も可能
+
+jobs:
+  collect-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Notion MCP server
+        run: npm install -g @notionhq/notion-mcp-server
+
+      - name: Configure Claude Code MCP settings
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          mkdir -p .claude
+          printf '{
+  "mcpServers": {
+    "Notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_API_KEY": "%s"
+      }
+    }
+  }
+}' "${NOTION_TOKEN}" > .claude/settings.json
+
+      - name: Run Claude Code news digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npx -y @anthropic-ai/claude-code \
+            --dangerously-skip-permissions \
+            -p "$(cat prompts/aus-news-daily.md)" \
+            --max-turns 100 \
+            --output-format text 2>&1
