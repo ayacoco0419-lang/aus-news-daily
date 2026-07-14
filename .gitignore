@@ -1,5 +1,5 @@
 # Claude Code settings (contains API tokens at runtime)
-.claude/settings.json
+.claude/
 
 # Node
 node_modules/
