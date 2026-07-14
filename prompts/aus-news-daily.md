@@ -12,8 +12,7 @@
 - 承認ドメイン外の記事は収録禁止:
   - 規制当局: `apra.gov.au` / `asic.gov.au` / `rba.gov.au`
   - 経済金融: `bloomberg.com`
-  - 豪州主要ニュース（Section B、媒体不問・以下のいずれか）: `abc.net.au` / `smh.com.au` / `theage.com.au` / `news.com.au` / `theguardian.com` / `afr.com` / `theaustralian.com.au` / `9news.com.au` / `skynews.com.au` / `reuters.com` / `apnews.com`
-
+  - 豪州主要ニュース（Section B、媒体不問・以下のいずれか）: `abc.net.au` / `theage.com.au` / `news.com.au` / `theguardian.com` / `afr.com` / `theaustralian.com.au` / `9news.com.au` / `reuters.com` / `apnews.com` / `financialstandard.com.au` / `ifa.com.au` / `riskinfo.com.au` / `financialnewswire.com.au` / `insurancenews.com.au`
 ---
 
 ## 厳守ルール（最重要）
@@ -65,29 +64,36 @@ Notion APIが失敗した場合は空リストで続行する。
 
 ## Step 4: Section B — 豪州主要ニュース10本
 
-**重要: このセクションのWebSearch呼び出しでは `allowed_domains` オプションを絶対に渡さないこと。** 複数ドメインを一度に指定すると400エラーになることが確認済み。また、承認ドメイン（abc.net.au / smh.com.au / theguardian.com / afr.com / 9news.com.au 等）はWebFetch・WebSearchのいずれからも直接アクセスできないケースが恒常的に発生している（"Claude Code is unable to fetch from ..."エラー、またはWebSearchで承認ドメインの記事が一切ヒットしない）。これはツール側の制約であり、クエリの工夫では解消しない。以下の優先順で取得する。
+**重要: このセクションのWebSearch呼び出しでは `allowed_domains` オプションを絶対に渡さないこと。** 複数ドメインを一度に指定すると400エラーになることが確認済み（単一ドメインを`site:`としてクエリ文字列に含める分には問題ない）。また、承認ドメインの多くはWebFetch・WebSearchのいずれからも直接アクセスできないケースが恒常的に発生している（"Claude Code is unable to fetch from ..."エラー等）。これはツール側の制約であり、クエリの工夫では解消しない。以下の優先順で取得する。
 
 1. **RSSフィード直接取得（WebFetchで直接取得。第1手段）:**
    - ABC News: `https://www.abc.net.au/news/feed/51120/rss.xml`
    - The Guardian AU: `https://www.theguardian.com/australia-news/rss`
    - Reuters: `https://feeds.reuters.com/reuters/businessNews`
-   - SMH: `https://www.smh.com.au/rss/feed.xml`
    - 9News: `https://www.9news.com.au/feed`
    - 取得できたRSSから `<item>` の `<title>` / `<link>` / `<pubDate>` を抽出する。個別のRSSが404等で失敗しても他のRSSは試し続けること。**多くの場合これらは全滅する（既知の問題）ため、失敗しても消耗せず速やかに手段2へ進むこと。**
 
 2. **Bing News RSSフォールバック（第2手段・推奨。手段1で10本に満たない場合）:**
-   承認ドメインごとに以下のURLパターンでWebFetchする（ドメインごとに個別実行すること。複数ドメインをORで結合すると精度が落ちる）:
+   以下のドメインごとに個別にWebFetchする（複数ドメインをORで結合すると精度が落ちるため、ドメインごとに分けて実行する）:
 
    `https://www.bing.com/news/search?q=site%3A{ドメイン}+Australia&qft=interval%3d%227%22&format=rss&mkt=en-AU`
 
-   対象ドメイン: abc.net.au / smh.com.au / theage.com.au / news.com.au / theguardian.com / afr.com / theaustralian.com.au / 9news.com.au / skynews.com.au / reuters.com / apnews.com
+   対象ドメイン: abc.net.au / theage.com.au / news.com.au / theguardian.com / afr.com / theaustralian.com.au / 9news.com.au / reuters.com / apnews.com / financialstandard.com.au / ifa.com.au
 
    - 取得できたRSSから `<item>` の `title` / `link` / `pubDate` を抽出する。
-   - **apnews.comは`link`が`http://www.bing.com/news/apiclick.aspx?...&url=<URLエンコードされた実URL>`というリダイレクトラッパー形式になっている。`url=`パラメータをURLデコードして実際のapnews.com記事URLを復元すること。** それ以外のドメイン（abc.net.au / theguardian.com / reuters.com / afr.com等）は`link`に直接記事URLが入っている。
-   - **稀に`https://www.smh.com.au#category/...`のように`/`が欠落したURLが返ることがある。ドメイン直後が`#`になっているURLを見つけたら、`#`を`/`に修正するか、WebFetchで実在確認してから採用すること。**
+   - **`link`が`http://www.bing.com/news/apiclick.aspx?...&url=<URLエンコードされた実URL>`というリダイレクトラッパー形式になっていることがある（news.com.au・apnews.comで確認済みだが他ドメインでも起こりうる）。`link`が`bing.com`ドメインになっている場合は必ず`url=`パラメータをURLデコードして実際の記事URLを復元すること。**
    - あるドメインで0件返ってきても異常ではない（その日その媒体にAustralia関連の新着がないだけの可能性がある）。1ドメインの0件で全体を諦めず、残りのドメインを試し続けること。
 
-3. **WebSearch（手段1・2で10本に満たない場合のみ、最終フォールバック）:** 以下のクエリを**ドメイン指定なし（allowed_domainsパラメータなし）**のプレーンテキストで実行し、返ってきた結果のURLを承認ドメインリストと手動で照合して絞り込む
+3. **WebSearch（site:単一ドメイン指定。第3手段。riskinfo.com.au / financialnewswire.com.au / insurancenews.com.auの3ドメイン専用）:**
+   この3ドメインはBing News RSSにインデックスされていないため手段2は使わず、WebSearchで直接取得する。**`allowed_domains`パラメータは使わず、クエリ文字列に`site:ドメイン名`を単一で含める形式（複数ドメイン同時指定は400エラーになるが単一なら問題ない）で実行する。**
+
+   | # | クエリ |
+   |---|---|
+   | Q1 | `site:riskinfo.com.au [SYDNEY_DATEの年]` |
+   | Q2 | `site:financialnewswire.com.au [SYDNEY_DATEの年月]` |
+   | Q3 | `site:insurancenews.com.au [SYDNEY_DATEの年]` |
+
+4. **WebSearch（プレーンテキスト。手段1〜3で10本に満たない場合のみ、最終フォールバック）:** 以下のクエリを**ドメイン指定なし（allowed_domainsパラメータなし）**のプレーンテキストで実行し、返ってきた結果のURLを承認ドメインリストと手動で照合して絞り込む
 
    | # | クエリ |
    |---|---|
@@ -95,10 +101,20 @@ Notion APIが失敗した場合は空リストで続行する。
    | Q2 | `Australia breaking news headlines [SYDNEY_DATEの月日]` |
    | Q3 | `Australia national news [SYDNEY_DATEの月日]` |
 
-承認ドメイン（`abc.net.au` / `smh.com.au` / `theage.com.au` / `news.com.au` / `theguardian.com` / `afr.com` / `theaustralian.com.au` / `9news.com.au` / `skynews.com.au` / `reuters.com` / `apnews.com`）に該当するURLのみ候補として採用する。
+承認ドメイン（`abc.net.au` / `theage.com.au` / `news.com.au` / `theguardian.com` / `afr.com` / `theaustralian.com.au` / `9news.com.au` / `reuters.com` / `apnews.com` / `financialstandard.com.au` / `ifa.com.au` / `riskinfo.com.au` / `financialnewswire.com.au` / `insurancenews.com.au`）に該当するURLのみ候補として採用する。
+
+---
+
+## 10本の選定基準（候補が10本を超える場合の優先順位）
+
+候補記事が10本を超える場合、以下の優先順位で上位10本を選定する（1が最優先。1〜3で10本に満たない場合のみ4から補充する）:
+
+1. **豪州経済に関する記事**（RBA・金融政策・インフレ・雇用・CPI・GDP・経済見通し・IMF見通し・OECD見通しのいずれかに該当するもの）
+2. **生命保険業界・APRA・ASICに関する記事**
+3. **Acenda・Nippon Life・TALに関する記事**
+4. **その他、豪州で注目度の高い政治・経済・社会ニュース**
 
 10本に満たない場合は取得できた件数のみ収録し、「◯本のみ取得」と明記する。
-
 ---
 
 ## Step 5: Section C — ブルームバーグ 豪州経済・金融ニュース（最大8件）
